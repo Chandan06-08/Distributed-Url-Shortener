@@ -1,13 +1,15 @@
-from fastapi import FastAPI
-from fastapi import HTTPException
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import RedirectResponse
-from app.models import URLRequest
-from app.storage import url_store
+
+from app.database import get_db
+from app.models import URL
+from app.schemas import URLRequest
+from fastapi import Depends
+from sqlalchemy.orm import Session
 import random
 import string
 
 app = FastAPI()
-
 
 
 def generate_code(length=6):
@@ -20,21 +22,48 @@ def generate_code(length=6):
 
 
 @app.post("/shorten")
-def shorten_url(request: URLRequest):
+def shorten_url(
+    request: URLRequest,
+    db: Session = Depends(get_db)
+):
     while True:
         code = generate_code()
-        if code not in url_store:
+
+        existing_url = db.query(URL).filter(
+            URL.short_code == code
+        ).first()
+
+        if existing_url is None:
             break
 
-    url_store[code] = request.url
+    new_url = URL(
+        short_code=code,
+        original_url=request.url
+    )
+
+    db.add(new_url)
+    db.commit()
+    db.refresh(new_url)
 
     return {
         "short_code": code
     }
 
 @app.get("/{code}")
-def redirect_to_url(code: str):
-    if code not in url_store:
-        raise HTTPException(status_code=404, detail="Short code not found")
-    original_url = url_store[code]
-    return RedirectResponse(url=original_url)
+def redirect_to_url(
+    code: str,
+    db: Session = Depends(get_db)
+):
+    url_record = db.query(URL).filter(
+        URL.short_code == code
+    ).first()
+
+    if url_record is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Short code not found"
+        )
+
+    return RedirectResponse(
+        url=url_record.original_url
+    )
