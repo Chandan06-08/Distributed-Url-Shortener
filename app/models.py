@@ -14,3 +14,4 @@ class URL(Base):
     short_code = Column(String(10), unique=True, nullable=False)
     original_url = Column(Text, nullable=False)
     created_at = Column(DateTime, server_default=func.now())
+    click_count = Column(BigInteger, nullable=False, default=0)
