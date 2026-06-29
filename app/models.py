@@ -15,3 +15,7 @@ class URL(Base):
     original_url = Column(Text, nullable=False)
     created_at = Column(DateTime, server_default=func.now())
     click_count = Column(BigInteger, nullable=False, default=0)
+    expires_at = Column(DateTime, nullable=True)
+
+
+   

@@ -6,6 +6,7 @@ from app.database import get_db
 from app.models import URL
 from app.schemas import URLRequest
 from app.cache import redis_client
+from datetime import datetime, timedelta
 
 import random
 import string
@@ -36,10 +37,15 @@ def shorten_url(
 
         if existing_url is None:
             break
+    expires_at = None
+
+    if request.expires_in_days is not None:
+        expires_at = datetime.now() + timedelta(days=request.expires_in_days)
 
     new_url = URL(
         short_code=code,
-        original_url=request.url
+        original_url=request.url,
+        expires_at=expires_at
     )
 
     db.add(new_url)
@@ -76,6 +82,12 @@ def redirect_to_url(
     url_record = db.query(URL).filter(
         URL.short_code == code
     ).first()
+    if url_record.expires_at is not None:
+        if datetime.now() >= url_record.expires_at:
+            raise HTTPException(
+                status_code=410,
+                detail="This URL has expired"
+            )
 
     if url_record is None:
         raise HTTPException(
